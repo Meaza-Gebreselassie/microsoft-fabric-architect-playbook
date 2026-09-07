@@ -4,9 +4,9 @@
 
 ### What is an On-Premises Data Gateway?
 
-The Microsoft on-premises data gateway acts as a bridge between Microsoft cloud services and data sources located inside an organization's private network.
+The Microsoft **on-premises data gateway** acts as a bridge between Microsoft cloud services and data sources located inside an organization's private network.
 
-For example, an organization may have SQL Server databases running on-premises while Microsoft Fabric or Power BI is running in the Microsoft cloud.
+For example, an organization may have SQL Server databases running on-premises while Microsoft Fabric or Power BI runs in the Microsoft cloud.
 
 The gateway allows supported Microsoft cloud services to securely communicate with those on-premises data sources without exposing the database directly to the internet.
 
@@ -16,11 +16,17 @@ The gateway allows supported Microsoft cloud services to securely communicate wi
 flowchart LR
     A["Microsoft Fabric / Power BI<br/>Microsoft Cloud"]
     B["On-Premises<br/>Data Gateway"]
-    C["On-Premises Data Sources<br/>SQL Server / Oracle / Files / etc."]
+    C["On-Premises Data Sources<br/>SQL Server / SSAS / Files / etc."]
 
     A --> B
     B --> C
 ```
+
+### Key Point
+
+The gateway is **not the data source** and does not store business data.
+
+It provides the communication path between supported Microsoft cloud services and data sources that remain inside the organization's private network.
 
 ---
 
@@ -35,34 +41,30 @@ There are two main modes of the on-premises data gateway:
 
 ### Personal Mode
 
-Personal mode is mainly intended for an individual Power BI user who needs to connect to on-premises data.
+Personal mode is mainly designed for an individual Power BI user who needs to connect to an on-premises data source.
 
 It can be useful for:
 
 - Individual Power BI development
-- Personal reporting
+- Personal or self-service reporting
 - Testing and learning
-- Scenarios where centralized gateway management is not required
 
-Personal mode cannot be shared with other users and does not support gateway clustering or high availability.
+Personal mode is associated with an individual user and is not intended to provide shared enterprise gateway infrastructure.
 
-For a shared enterprise environment, I would use the standard on-premises data gateway instead of personal mode.
+For centrally managed enterprise environments, I prefer the **standard on-premises data gateway**.
 
 ### Standard Mode
 
 The standard on-premises data gateway is designed for shared and enterprise environments.
 
-A standard gateway can support multiple users and multiple configured data source connections.
+It allows gateway infrastructure to be centrally managed and can support multiple users, workloads, and configured data source connections.
 
-Instead of each user maintaining a personal gateway, the organization can centrally manage the gateway infrastructure and allow authorized users and workloads to use it.
-
-Typical scenarios include:
+Typical use cases include:
 
 - Microsoft Fabric
 - Shared Power BI environments
-- Multiple data source connections
 - Multiple users and teams
-- Centralized gateway administration
+- Multiple data source connections
 - Production workloads
 - High-availability gateway clusters
 
@@ -70,23 +72,29 @@ Typical scenarios include:
 
 ## 3. Standard Gateway Architecture
 
-A shared gateway can provide access to multiple on-premises data sources.
+A standard gateway can provide connectivity to multiple supported on-premises data sources.
 
 ```mermaid
 flowchart TD
     A["Microsoft Fabric / Power BI"]
     B["Standard On-Premises<br/>Data Gateway"]
+
     C["SQL Server"]
-    D["Oracle"]
-    E["Other Supported<br/>Data Sources"]
+    D["SQL Server<br/>Analysis Services"]
+    E["File Share"]
+    F["Other Supported<br/>Data Sources"]
 
     A --> B
+
     B --> C
     B --> D
     B --> E
+    B --> F
 ```
 
-### Benefits of Standard Mode
+Instead of individual users maintaining separate personal gateways, authorized users and workloads can use centrally managed gateway infrastructure.
+
+### Benefits
 
 - Centralized administration
 - Shared gateway infrastructure
@@ -100,142 +108,318 @@ flowchart TD
 
 ## 4. Gateway Cluster and High Availability
 
-For a production environment, relying on a single gateway server introduces a single point of failure.
+For production environments, I prefer to use a **gateway cluster** instead of relying on a single gateway server.
 
-A better design is to configure multiple standard gateway installations as a **gateway cluster**.
-
-For example:
+A gateway cluster contains multiple gateway nodes that work together to provide high availability.
 
 ```mermaid
 flowchart TD
     A["Microsoft Fabric / Power BI"]
+    B["PROD Gateway Cluster"]
 
-    A --> G["Gateway Cluster"]
+    C["Gateway Node 1"]
+    D["Gateway Node 2"]
 
-    G --> P["Gateway Node 1<br/>Primary"]
-    G --> S["Gateway Node 2<br/>Secondary"]
+    E["On-Premises Data Sources"]
 
-    P --> D["On-Premises<br/>Data Sources"]
-    S --> D
+    A --> B
+    B --> C
+    B --> D
+
+    C --> E
+    D --> E
 ```
 
-Each gateway node is installed on a separate machine and registered as a member of the same gateway cluster.
+If one gateway node becomes unavailable because of maintenance, patching, restart, or server failure, another available node in the cluster can continue handling gateway requests.
 
-### Failover
+### Gateway Node Placement
 
-Under the normal cluster behavior, requests use the primary gateway member.
+Gateway nodes should be installed on **separate servers or virtual machines** so that the failure of one server does not make the entire gateway unavailable.
 
-If the primary gateway becomes unavailable, the gateway service routes requests to another available member of the cluster.
+Where possible, I would also avoid placing both production gateway nodes on infrastructure that has the same failure point.
+
+Both gateway nodes must have reliable network connectivity to the data sources they support.
+
+### High Availability vs. Disaster Recovery
+
+A gateway cluster primarily provides **high availability** for gateway node failures.
+
+Disaster recovery is a broader architecture consideration.
+
+If protection from a datacenter or regional outage is required, I would design that separately based on the organization's business continuity and recovery requirements.
+
+---
+
+## 5. Environment Separation
+
+For enterprise environments, I prefer to separate gateway infrastructure by environment.
+
+For example:
+
+- DEV
+- PRE-PROD / TEST
+- PROD
+
+```mermaid
+flowchart TD
+
+    DEV["Development"] --> DG["DEV Gateway"]
+    PRE["Pre-Production"] --> PG["PRE-PROD Gateway"]
+    PROD["Production"] --> PRG["PROD Gateway Cluster"]
+
+    DG --> DD["DEV Data Sources"]
+    PG --> PD["PRE-PROD Data Sources"]
+    PRG --> PRD["PROD Data Sources"]
+```
+
+Separating the environments provides better isolation between development, testing, and production workloads.
+
+For example, development testing or a large refresh should not compete for the same gateway resources being used by production.
+
+It also allows production gateway infrastructure to have its own security, maintenance, monitoring, and high-availability requirements.
+
+---
+
+## 6. Gateway Connections and Naming Standards
+
+A standard gateway can support connections to different types of on-premises data sources.
+
+Examples include:
+
+- SQL Server
+- SQL Server Analysis Services
+- Oracle
+- File shares
+- Other supported on-premises sources
+
+I prefer to use a consistent naming convention for gateway connections so administrators can easily identify the environment, source type, and purpose.
+
+### Naming Convention
+
+```text
+<Environment>-<SourceType>-<ApplicationOrPurpose>
+```
+
+Examples:
+
+```text
+DEV-SQL-Finance
+DEV-SSAS-Sales
+DEV-FILESHARE-Reporting
+
+PREPROD-SQL-Finance
+PREPROD-SSAS-Sales
+PREPROD-FILESHARE-Reporting
+
+PROD-SQL-Finance
+PROD-SSAS-Sales
+PROD-FILESHARE-Reporting
+```
+
+The exact naming convention can vary by organization.
+
+The important point is to use a **consistent standard** rather than allowing connections to be created with unclear or inconsistent names.
+
+---
+
+## 7. On-Premises vs. Cloud Connections
+
+Not every Microsoft Fabric connection requires an on-premises data gateway.
+
+The connection method should depend on **where the data source is located and how it can be securely accessed**.
+
+### On-Premises Data Sources
+
+For supported data sources located inside the organization's private network, the standard on-premises data gateway can provide the connectivity path.
 
 ```mermaid
 flowchart LR
-    A["Microsoft Fabric / Power BI"]
-    B["Gateway Node 1<br/>Primary - Unavailable"]
-    C["Gateway Node 2<br/>Available"]
-    D["On-Premises Data Source"]
+    A["Microsoft Fabric"]
+    B["Standard On-Premises<br/>Data Gateway"]
+    C["On-Premises Data Sources<br/>SQL / SSAS / File Share / etc."]
 
-    A -. "Unavailable" .-> B
-    A -->|"Failover"| C
-    C --> D
+    A --> B
+    B --> C
 ```
 
-This removes the individual gateway server as a single point of failure.
+### Cloud Data Sources
 
-### Example
+For supported cloud data sources, a **cloud connection** can be used when an on-premises gateway is not required.
 
-If Gateway Node 1 is unavailable because of:
+```mermaid
+flowchart LR
+    A["Microsoft Fabric"]
+    B["Cloud Connection"]
+    C["Supported Cloud<br/>Data Source"]
 
-- Server maintenance
-- Operating system patching
-- Server restart
-- Gateway service failure
-- Hardware or VM failure
+    A --> B
+    B --> C
+```
 
-Gateway Node 2 can continue handling gateway requests.
-
-This allows planned maintenance to be performed with less impact to workloads that depend on the gateway.
+This avoids introducing gateway infrastructure when Fabric can securely connect to the cloud data source using a supported connection method.
 
 ---
 
-## 5. Gateway Server Placement
+## 8. Authentication
 
-Gateway nodes should be installed on separate machines.
+Authentication determines **which identity Fabric uses to access a data source**.
 
-For production environments, I would also avoid placing both gateway nodes on infrastructure that shares the same failure point.
+For enterprise workloads, I prefer to avoid using an individual employee account for production connections. The authentication method should be selected based on the data source, connector, and authentication options supported by that workload.
 
-For example, where infrastructure design allows:
+### Authentication Options
 
-```text
-Gateway Cluster
-│
-├── Gateway Node 1
-│   └── Location / Failure Domain A
-│
-└── Gateway Node 2
-    └── Location / Failure Domain B
-```
-
-The goal is to avoid a situation where one infrastructure failure takes both gateway nodes offline.
-
-Gateway servers should also have reliable network connectivity to the data sources they access. Network latency between the gateway and the data source should be considered when deciding where the gateway servers are located.
+| Authentication | Best Fit | Example |
+|---|---|---|
+| **Service Account** | Traditional on-premises resources | SQL Server, SSAS, File Share |
+| **Service Principal** | Application/workload authentication using Microsoft Entra ID | Supported Azure and cloud resources |
+| **Workspace Identity** | Fabric-managed identity | Supported Fabric-to-Azure/cloud scenarios |
+| **User Account** | Development or interactive access | Individual development/testing |
 
 ---
 
-## 6. High Availability vs. Disaster Recovery
+### Service Account
 
-High availability and disaster recovery solve different problems.
+For traditional on-premises data sources that require Windows authentication, a dedicated **service account** can be used for the gateway connection.
 
-### High Availability
+For example:
 
-A gateway cluster protects against the failure of an individual gateway server.
+```mermaid
+flowchart LR
+    A["Microsoft Fabric"] --> B["On-Premises Gateway"]
+    B --> C["SQL Server"]
+```
+
+The **gateway provides the connectivity**, while the configured service account provides the credentials used to authenticate to the data source.
+
+The service account should follow least-privilege principles and only receive the permissions required by the connection.
+
+A dedicated service account is preferable to using an individual employee account for production workloads because the connection is not tied to an individual user's account lifecycle.
+
+> **Important:** The account running the Windows gateway service and the credentials configured for a gateway data source connection are separate concepts.
+
+---
+
+### Service Principal
+
+A **service principal** is a non-human Microsoft Entra identity that can be used for application or workload authentication where supported.
+
+Instead of a person's account:
 
 ```text
-Gateway Node 1 fails
+Individual User
+     ❌
+Production Workload
+```
+
+the workload can use:
+
+```text
+Production Workload
         ↓
-Gateway Node 2 continues processing requests
+Service Principal
+        ↓
+Supported Resource
 ```
 
-### Disaster Recovery
+This is useful for automated workloads because authentication does not depend on an individual user's account.
 
-For environments where a regional outage is an important business risk, a separate disaster recovery design should also be considered.
+Service principals can be useful for:
 
-This may include gateway infrastructure in another location or Azure region, depending on the organization's architecture and recovery requirements.
+- Automated workloads
+- Pipelines
+- Application-to-application authentication
+- CI/CD
+- Supported cloud data connections
 
-The objective is different:
-
-**Gateway Cluster**
-→ Protects against gateway node/server failure.
-
-**Disaster Recovery Design**
-→ Protects against a larger infrastructure or regional failure.
+For SQL Server 2022 and later, Microsoft Entra authentication can be configured in supported environments. However, the authentication method must still be supported by the specific Fabric connector and connection scenario.
 
 ---
 
-## 7. Gateway Design Principles
+### Workspace Identity
 
-For an enterprise gateway environment, my design principles are:
+A **workspace identity** is an identity associated with a Microsoft Fabric workspace.
 
-1. Use the **standard on-premises data gateway** for shared workloads.
-2. Avoid personal gateways for centrally managed production solutions.
-3. Use a **gateway cluster** for production high availability.
-4. Install gateway cluster members on **separate machines**.
-5. Avoid placing all gateway nodes within the same infrastructure failure point when possible.
-6. Keep gateway nodes reasonably close to the data sources to reduce unnecessary network latency.
-7. Keep gateway members on the same supported gateway version.
-8. Monitor gateway availability, resource utilization, and connectivity.
-9. Document and protect the gateway recovery key.
-10. Consider a separate disaster recovery architecture when regional resiliency is required.
+Where supported, Fabric workloads can use the workspace identity to authenticate to other resources.
+
+```mermaid
+flowchart LR
+    A["Fabric Workspace"] --> B["Workspace Identity"]
+    B --> C["Supported Cloud Resource"]
+```
+
+This provides an important advantage for enterprise architecture:
+
+**the workload is associated with the workspace rather than an individual user's identity.**
+
+Fabric manages the identity credentials, reducing the need to maintain passwords or service principal secrets.
+
+Workspace identity should be used only for workloads and connections that support it.
+
+It should not be confused with the on-premises data gateway:
+
+| Gateway | Workspace Identity |
+|---|---|
+| Provides network connectivity | Provides authentication identity |
+| Primarily connects to private/on-premises sources | Used by supported Fabric workloads |
+| Runs on gateway infrastructure | Associated with the Fabric workspace |
 
 ---
 
-## My Understanding
+### My Authentication Approach
 
-I think of the gateway as a secure bridge between Microsoft cloud services and data sources that remain inside an organization's private network.
+For production workloads, my preference is to use a **non-personal identity whenever the technology supports it**.
 
-For an enterprise environment, I prefer the standard on-premises data gateway because it can be centrally managed and shared across multiple users and data source connections.
+The choice depends on the connection:
 
-For production, I would not want the gateway to depend on a single server. I would configure at least two gateway nodes as a cluster so another node can continue processing requests if one gateway server becomes unavailable.
+**On-Premises + Windows Authentication**  
+→ Dedicated service account
 
-I would also separate the gateway nodes across infrastructure failure domains where practical, while keeping network latency to the underlying data sources in mind.
+**Supported Entra-based application authentication**  
+→ Service principal
 
-For systems that require protection from a larger site or regional outage, I would treat disaster recovery as a separate architecture decision rather than assuming that a basic two-node gateway cluster provides regional disaster recovery.
+**Supported Fabric workspace authentication**  
+→ Workspace identity
+
+**Development / Interactive Access**  
+→ User identity where appropriate
+
+The goal is to use **least privilege**, avoid unnecessary dependency on individual user accounts, and select the authentication method supported by the specific workload and data source.
+---
+
+## 9. Architecture Summary
+
+My general approach is:
+
+```mermaid
+flowchart TD
+    A["Data Source"]
+
+    A --> B{"Where is the<br/>data source?"}
+
+    B -->|"On-Premises / Private"| C["Standard On-Premises<br/>Data Gateway"]
+
+    B -->|"Cloud"| D["Cloud Connection"]
+
+    C --> E{"Production?"}
+
+    E -->|"Yes"| F["Gateway Cluster<br/>for High Availability"]
+    E -->|"No"| G["Environment-Appropriate<br/>Gateway"]
+
+    D --> H["Use Supported<br/>Authentication"]
+
+    H --> I["Workspace Identity<br/>where supported"]
+```
+
+The main principle is that I don't automatically use a gateway for every connection.
+
+I first consider:
+
+**Data Source Location → Connectivity → Authentication → Environment → Availability**
+
+For on-premises data sources, the standard gateway provides the connectivity path.
+
+For cloud data sources, I prefer cloud-native connections when supported.
+
+For production gateway workloads, I prefer a gateway cluster rather than relying on a single gateway server.
+
+For enterprise environments, I also prefer separating DEV, PRE-PROD, and PROD gateway infrastructure to provide better workload and security isolation.

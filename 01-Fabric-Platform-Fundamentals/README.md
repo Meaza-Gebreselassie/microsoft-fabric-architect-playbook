@@ -12,7 +12,7 @@ The goal is to understand the Fabric platform before moving into individual work
 
 - What is Microsoft Fabric?
 - Fabric as a Software as a Service (SaaS) platform
-- Why organizations use Fabric
+- Why organizations use Fabric?
 - Unified data and analytics platform
 
 ### 2. Fabric Platform Architecture

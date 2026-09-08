@@ -16,7 +16,6 @@ Notes related to the Microsoft on-premises data gateway, including:
 - High availability
 - Data source configuration
 - Authentication and service accounts
-- Network connectivity
 - Gateway monitoring
 - Troubleshooting refresh and connectivity issues
 

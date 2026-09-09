@@ -690,7 +690,6 @@ The goal is to provide:
 
 ## Related Documentation
 
-- [01 — Workspace Roles & Permissions](01-Workspace-Roles-and-Permissions.md)
 - [Microsoft Fabric OneLake security](https://learn.microsoft.com/en-us/fabric/onelake/security/get-started-security)
 - [Create and manage OneLake security roles](https://learn.microsoft.com/en-us/fabric/onelake/security/create-manage-roles)
 - [OneLake data access control model](https://learn.microsoft.com/en-us/fabric/onelake/security/data-access-control-model)

@@ -17,7 +17,7 @@ The focus is understanding what each workload does and how the workloads work to
 
 ## Topics
 
-1. [Microsoft Fabric Overview](./Microsoft-Fabric-Overview.md)
+1. [Microsoft Fabric Overview](./01-Microsoft-Fabric-Overview.md)
 2. Fabric Platform Architecture
 3. OneLake Fundamentals
 4. Capacity Fundamentals
